@@ -58,6 +58,8 @@ class Document:
         for paragraph in self.paragraphs:
             if func(paragraph.text):
                 new_pars.append(paragraph)
+            else:
+                logging.info("[INFO] Discarding paragraph %s" % paragraph)
 
         self.paragraphs = new_pars
         return self
@@ -145,6 +147,8 @@ class Document:
         if total_count != len(self.footnotes):
             logging.warning("We got %s links in document and %s footnotes, check logs for warnings" % (total_count,
                                                                                                         len(self.footnotes)))
+        else:
+            logging.info("There are %s footnotes for now" % total_count)
 
         return self
 

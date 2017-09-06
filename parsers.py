@@ -121,6 +121,7 @@ def canonic_links(text):
             index += 1
             token = token_list[index]
 
+            # -- here is where algorithm takes place, fine tune here
             if token == ')':
                 break
             elif token == '.':
@@ -146,6 +147,8 @@ def canonic_links(text):
                 result['result'] += token.replace(',', ':')
             else:
                 break
+
+            # -- here it ends
 
         result['final_index'] = index - 3
         for symbol in '.,:':
@@ -177,5 +180,8 @@ def canonic_links(text):
                 logging.info('[CHANGED] %s -> %s', text[st_offset:end_offset], result['result'])
                 logging.debug('[DEBUG] %s ', result)
                 changes.append((st_offset, end_offset, result['result']))
+
+    for change in reversed(changes):
+        text = text[:change[0]] + change[2] + text[change[1]:]
 
     return text

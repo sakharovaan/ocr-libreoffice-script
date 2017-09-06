@@ -36,7 +36,7 @@ def get_model():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     model = get_model()
     document = Document().from_model(model)
