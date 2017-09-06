@@ -43,7 +43,7 @@ if __name__ == "__main__":
     document.strip_empty()
     document.strip_custom(lambda x: not(len(x) == 3 and str(x).isdecimal()))  # page numbers
     document.strip_footnotes(('*'*(i+1) for i in range(1000)))
-    #document.check(lambda x: len(x) > 60, "Too short paragraph ")
+    document.check(lambda x: len(x) > 60, "Too short paragraph ")
     document.replace_footnotes(('*'*(i+1) for i in range(1000)))
     document.merge_paragraphs()
     document.prepare_paragraphs(middle_dash_between_digits)
