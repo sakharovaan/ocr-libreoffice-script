@@ -1,5 +1,14 @@
-# ocr-libreoffice-script
+# postocr
 Script for post-processing text from OCR machines in libreoffice
+
+### Capabilities (can be disabled by user)
+* Strip empty paragraphs
+* Strip paragraphs with custom function
+* Find and replace footnotes on each page (using custom iterator) as built-in footnote
+* Merge paragraphs (if next comes not with an upper letter)
+* Keep only basic formatting: bold, italic, underlined
+* Replace dash between digits to middle-sized dash
+* Replace canonical links like (1 Паралип. 28, 5–7) to (1Пар.28:5–7)
 
 
 ### Running
