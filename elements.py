@@ -1,4 +1,14 @@
 import logging
+import textwrap
+
+TAGS = dict(
+    open_bold='{{b}}',
+    close_bold='{{/b}}',
+    open_italic='{{i}}',
+    close_italic='{{/i}}',
+    open_underline='{{u}}',
+    close_underline='{{/u}}'
+)
 
 
 class Document:
@@ -16,10 +26,10 @@ class Document:
         :return:
         """
 
-        formats = dict(  # with spaces for correct tokenizing
-            bold=dict(open=' {{b}} ', close=' {{/b}} '),
-            italic=dict(open=' {{i}} ', close=' {{/i}} '),
-            underlined=dict(open=' {{u}} ', close=' {{/u}} ')
+        formats = dict(
+            bold=dict(open=TAGS['open_bold'], close=TAGS['close_bold']),
+            italic=dict(open=TAGS['open_italic'], close=TAGS['close_italic']),
+            underlined=dict(open=TAGS['open_underline'], close=TAGS['close_underline'])
         )
 
         for k, v in formats.items():
@@ -36,47 +46,36 @@ class Document:
         cursor = text.createTextCursor()
         view_cursor = ctrl.getViewCursor()
         enum = text.createEnumeration()
-        transf = ctrl.getTransferable()
-
-        format_dict = dict(bold=False, italic=False, underlined=False)
 
         while enum.hasMoreElements():
             # iterate over all paragraphs
             paragraph = enum.nextElement()
 
             text = ""
-            prev_word_whitespace = ""
-            word_string = ""
+            text_untagged = ""
+            format_dict = dict(bold=False, italic=False, underlined=False)
+
             cursor.gotoRange(paragraph.getStart(), False)
             view_cursor.gotoRange(paragraph.getStart(), False)
 
             # iterate over words and save their formatting
 
-            while True:
-                # TODO correct styling
-                cursor.gotoEndOfWord(True)  # select only current word
-                prev_word_whitespace = cursor.String  # only word
-                new_fmt_dict = dict(bold=cursor.CharWeight > 100,
-                                    italic=cursor.CharPosture.value == 'ITALIC',
-                                    underlined=cursor.CharUnderline > 0)  # style of current word
+            par_enum = paragraph.createEnumeration()
+            while par_enum.hasMoreElements():  # usually this is a word or part of it with unique formatting
+                par_el = par_enum.nextElement()
 
-                text += self._decide_tag(word_string, format_dict, new_fmt_dict)  # add word and its style
-                if len(prev_word_whitespace) > 0:  # add whitespace with new style
-                    text += self._decide_tag(prev_word_whitespace, format_dict, new_fmt_dict)
+                new_fmt_dict = dict(bold=par_el.CharWeight > 100,
+                                    italic=par_el.CharPosture.value == 'ITALIC',
+                                    underlined=par_el.CharUnderline > 0)  # style of current word
 
+                text += self._decide_tag(par_el.String, format_dict, new_fmt_dict)
+                text_untagged += par_el.String
                 format_dict = new_fmt_dict
 
-                cursor.gotoEndOfWord(False)
-                cursor.gotoNextWord(True)  # select all spacing and punctuation to next one
-                word_string = cursor.String  # punctuation and such
-                if cursor.isEndOfParagraph():
-                    # close all tags and leave
-                    text += self._decide_tag('', format_dict, dict(bold=False, italic=False, underlined=False))
-                    break
-                else:
-                    cursor.gotoStartOfWord(False)  # reset selection from [curr-s;next-s] to [next-s;next-s]
+            else:
+                text += self._decide_tag('', format_dict, dict(bold=False, italic=False, underlined=False))
 
-            self.paragraphs.append(Paragraph(view_cursor.getPage(), text, paragraph))
+            self.paragraphs.append(Paragraph(view_cursor.getPage(), text, text_untagged, paragraph))
 
         return self
 
@@ -96,18 +95,25 @@ class Document:
                     logging.warning("%s (para %s)" % (message, paragraph))
 
     def strip_empty(self):
-        return self.strip_custom(lambda x: x)
+        return self.strip_custom(lambda x: x, use_tagged=False)
 
-    def strip_custom(self, func):
+    def strip_custom(self, func, use_tagged=True):
         """
         Strip paragraphs matching to a custom function(text) -> true if keep, falsy if get rid of
 
         :param func: custom function
+        :param use_tagged: use tagged or untagged version of paragraph's text
         """
         new_pars = []
 
         for paragraph in self.paragraphs:
-            if func(paragraph.text):
+
+            if use_tagged:
+                attr = 'text'
+            else:
+                attr = 'text_untagged'
+
+            if func(getattr(paragraph, attr)):
                 new_pars.append(paragraph)
             else:
                 logging.info("[INFO] Discarding paragraph %s" % paragraph)
@@ -134,7 +140,7 @@ class Document:
                 footnote_num = 0
                 cur_page = paragraph.page_num
 
-            if not str(paragraph.text).startswith(gen_arr[footnote_num]):
+            if not str(paragraph.text_untagged).startswith(gen_arr[footnote_num]):
                 if footnote_num == 0:
                     # ordinary paragraph
 
@@ -143,10 +149,18 @@ class Document:
                 else:
                     # continuation of previous paragraph
 
-                    self.footnotes[-1:][0] += Footnote(paragraph.page_num, paragraph.text, None, footnote_num - 1)
+                    self.footnotes[-1:][0] += Footnote(paragraph.page_num,
+                                                       paragraph.text,
+                                                       paragraph.text_untagged,
+                                                       None,
+                                                       footnote_num - 1)
             else:
                 # a new footnote
-                self.footnotes.append(Footnote(paragraph.page_num, paragraph.text, gen_arr[footnote_num], footnote_num))
+                self.footnotes.append(Footnote(paragraph.page_num,
+                                               paragraph.text,
+                                               paragraph.text_untagged,
+                                               gen_arr[footnote_num],
+                                               footnote_num))
                 footnote_num += 1
 
         self.paragraphs = new_pars
@@ -212,7 +226,8 @@ class Document:
         new_pars = []
 
         for paragraph in self.paragraphs:
-            if not str(paragraph.text[0]).isupper() and len(new_pars) > 0:
+            if not str(paragraph.text_untagged[0]).isupper() and len(new_pars) > 0:
+                logging.info("[CHANGED] Merging paragraphs %s and %s", new_pars[-1:][0], paragraph)
                 new_pars[-1:][0] += paragraph
             else:
                 new_pars.append(paragraph)
@@ -221,57 +236,70 @@ class Document:
 
         return self
 
-    def prepare_paragraphs(self, func):
+    def prepare_paragraphs(self, func, apply_on_untagged=True):
         """
         Replace output of given func as text to all paragraphs
 
-        :param func:
+        :param func: custom func
+        :param apply_on_untagged: apply also on untagged version
         :return:
         """
         for i, paragraph in enumerate(self.paragraphs):
+            logging.info("[START] Apply %s on paragraph %s (tagged version)", func.__name__, paragraph)
             self.paragraphs[i].text = func(paragraph.text)
+
+            if apply_on_untagged:
+                logging.info("[START] Apply %s on paragraph %s (untagged version)", func.__name__, paragraph)
+                self.paragraphs[i].text_untagged = func(paragraph.text_untagged)
 
         return self
 
-    def prepare_footnotes(self, func):
+    def prepare_footnotes(self, func, apply_on_untagged=True):
         """
         Replace output of given func as text to all footnotes
 
         :param func:
+        :param apply_on_untagged: apply also on untagged version
         :return:
         """
         for i, footnote in enumerate(self.footnotes):
+            logging.info("[START] Apply %s on footnote %s (tagged version)", func.__name__, footnote)
             self.footnotes[i].text = func(footnote.text)
+            if apply_on_untagged:
+                logging.info("[START] Apply %s on footnote %s (untagged version)", func.__name__, footnote)
+                self.footnotes[i].text_untagged = func(footnote.text_untagged)
 
         return self
 
 
 class Paragraph:
-    def __init__(self, page_num, text, origin):
+    def __init__(self, page_num, text, text_untagged, origin):
         self.page_num = page_num
         self.text = text
+        self.text_untagged = text_untagged
         self.origin = [origin]
 
     def __repr__(self):
-        return "<Paragraph page:%s text: %s>" % (self.page_num, self.text)
+        return "<Paragraph page:%s text: %s>" % (self.page_num,
+                                                 textwrap.shorten(self.text_untagged, width=30))
 
     def __iadd__(self, other):
         self.text += " " + other.text
+        self.text_untagged += " " + other.text_untagged
         self.origin.extend(other.origin)
         return self
 
 
 class Footnote:
-    def __init__(self, page_num, text, starts_with, num_on_page):
+    def __init__(self, page_num, text, text_untagged, starts_with, num_on_page):
         self.page_num = page_num
         self.num_on_page = num_on_page
-        if starts_with:
-            self.text = str(text).strip().replace(starts_with, '', 1)
-        else:
-            self.text = str(text).strip()
+        self.text = self._cut_startswith(str(text).strip(), starts_with)
+        self.text_untagged = self._cut_startswith(str(text_untagged).strip(), starts_with, tagged=False)
 
     def __repr__(self):
-        return "<Footnote page:%s->%s text: %s>" % (self.page_num, self.num_on_page, self.text)
+        return "<Footnote page:%s->%s text: %s>" % (self.page_num, self.num_on_page,
+                                                    textwrap.shorten(self.text_untagged, width=30))
 
     def __iadd__(self, other):
         if other.num_on_page != self.num_on_page:
@@ -280,3 +308,14 @@ class Footnote:
 
         else:
             self.text += other.text
+
+    @staticmethod
+    def _cut_startswith(text, starts_with, tagged=True):
+        if starts_with:
+            if tagged:
+                for symbol in starts_with:
+                    text = text.replace(symbol, '', 1)
+            else:
+                text = text.replace(starts_with, '', 1)
+
+        return text

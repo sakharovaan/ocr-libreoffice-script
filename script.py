@@ -36,7 +36,7 @@ if __name__ == "__main__":
     model = get_model()
     document = Document().from_model(model)
     document.strip_empty()
-    document.strip_custom(lambda x: not(len(x) == 3 and str(x).isdecimal()))  # page numbers
+    document.strip_custom(lambda x: not(len(x) == 3 and str(x).isdecimal()), use_tagged=False)  # page numbers
     document.strip_footnotes(('*'*(i+1) for i in range(1000)))
     document.check(lambda x: len(x) > 60, "Too short paragraph ")
     document.replace_footnotes(('*'*(i+1) for i in range(1000)))

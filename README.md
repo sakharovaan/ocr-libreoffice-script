@@ -11,4 +11,3 @@ Script for post-processing text from OCR machines in libreoffice
 ### Current limitations / TODO
 
 * doesn't recognise footnotes continuing on other page
-* recognizes style (B, I, U) only of the whole word
