@@ -16,10 +16,10 @@ class Document:
         :return:
         """
 
-        formats = dict(
-            bold=dict(open='{{b}}', close='{{/b}}'),
-            italic=dict(open='{{i}}', close='{{/i}'),
-            underlined=dict(open='{{u}}', close='{{/u}}')
+        formats = dict(  # with spaces for correct tokenizing
+            bold=dict(open=' {{b}} ', close=' {{/b}} '),
+            italic=dict(open=' {{i}} ', close=' {{/i}} '),
+            underlined=dict(open=' {{u}} ', close=' {{/u}} ')
         )
 
         for k, v in formats.items():
@@ -28,7 +28,7 @@ class Document:
             elif not old_fmt_dict[k] and new_fmt_dict[k]:
                 word = v['open'] + word
 
-        return word != word or word
+        return word
 
     def from_model(self, model):
         ctrl = model.getCurrentController()
@@ -45,21 +45,40 @@ class Document:
             paragraph = enum.nextElement()
 
             text = ""
+            prev_word_whitespace = ""
+            word_string = ""
             cursor.gotoRange(paragraph.getStart(), False)
             view_cursor.gotoRange(paragraph.getStart(), False)
 
             # iterate over words and save their formatting
 
-            while not cursor.isEndOfParagraph():
-                cursor.gotoEndOfWord(True)
+            while True:
+                # TODO correct styling
+                cursor.gotoEndOfWord(True)  # select only current word
+                prev_word_whitespace = cursor.String  # only word
                 new_fmt_dict = dict(bold=cursor.CharWeight > 100,
                                     italic=cursor.CharPosture.value == 'ITALIC',
-                                    underlined=cursor.CharUnderline > 0)
-                text += self._decide_tag(cursor.String, format_dict, new_fmt_dict) + ' '
+                                    underlined=cursor.CharUnderline > 0)  # style of current word
+
+                text += self._decide_tag(word_string, format_dict, new_fmt_dict)  # add word and its style
+                if len(prev_word_whitespace) > 0:  # add whitespace with new style
+                    text += self._decide_tag(prev_word_whitespace, format_dict, new_fmt_dict)
+
                 format_dict = new_fmt_dict
-                cursor.gotoNextWord(False)
+
+                cursor.gotoEndOfWord(False)
+                cursor.gotoNextWord(True)  # select all spacing and punctuation to next one
+                word_string = cursor.String  # punctuation and such
+                if cursor.isEndOfParagraph():
+                    # close all tags and leave
+                    text += self._decide_tag('', format_dict, dict(bold=False, italic=False, underlined=False))
+                    break
+                else:
+                    cursor.gotoStartOfWord(False)  # reset selection from [curr-s;next-s] to [next-s;next-s]
 
             self.paragraphs.append(Paragraph(view_cursor.getPage(), text, paragraph))
+
+        return self
 
     def check(self, func, message, fail=False):
         """
