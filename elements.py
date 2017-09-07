@@ -6,39 +6,60 @@ class Document:
         self.paragraphs = []
         self.footnotes = []
 
+    def _decide_tag(self, word, old_fmt_dict, new_fmt_dict):
+        """
+        Decide tagging for current word
+
+        :param word: a word to use with tag
+        :param old_fmt_dict: fmt_dict for previous word
+        :param new_fmt_dict: fmt_dict for this word
+        :return:
+        """
+
+        formats = dict(
+            bold=dict(open='{{b}}', close='{{/b}}'),
+            italic=dict(open='{{i}}', close='{{/i}'),
+            underlined=dict(open='{{u}}', close='{{/u}}')
+        )
+
+        for k, v in formats.items():
+            if old_fmt_dict[k] and not new_fmt_dict[k]:
+                word = v['close'] + word
+            elif not old_fmt_dict[k] and new_fmt_dict[k]:
+                word = v['open'] + word
+
+        return word != word or word
+
     def from_model(self, model):
         ctrl = model.getCurrentController()
         text = model.Text
-        # search = model.createSearchDescriptor()
         cursor = text.createTextCursor()
         view_cursor = ctrl.getViewCursor()
         enum = text.createEnumeration()
+        transf = ctrl.getTransferable()
 
-        while True:
+        format_dict = dict(bold=False, italic=False, underlined=False)
+
+        while enum.hasMoreElements():
             # iterate over all paragraphs
-            try:
-                paragraph = enum.nextElement()
-            except:
-                pass
-            else:
-                cursor.gotoRange(paragraph.getStart(), False)
-                view_cursor.gotoRange(paragraph.getStart(), False)
+            paragraph = enum.nextElement()
 
-                # iterate over words and save their formatting
-                styled_words = []
+            text = ""
+            cursor.gotoRange(paragraph.getStart(), False)
+            view_cursor.gotoRange(paragraph.getStart(), False)
+
+            # iterate over words and save their formatting
+
+            while not cursor.isEndOfParagraph():
                 cursor.gotoEndOfWord(True)
-                while True:
-                    word = StyledWord(cursor.String,
-                                      cursor.CharWeight,
-                                      cursor.CharPosture.value,
-                                      cursor.CharUnderline)
-                    styled_words.append(word)
-                    cursor.gotoNextWord(False)
-                    print(word)
+                new_fmt_dict = dict(bold=cursor.CharWeight > 100,
+                                    italic=cursor.CharPosture.value == 'ITALIC',
+                                    underlined=cursor.CharUnderline > 0)
+                text += self._decide_tag(cursor.String, format_dict, new_fmt_dict) + ' '
+                format_dict = new_fmt_dict
+                cursor.gotoNextWord(False)
 
-                self.paragraphs.append(Paragraph(view_cursor.getPage(), paragraph, styled_words))
-
-        return self
+            self.paragraphs.append(Paragraph(view_cursor.getPage(), text, paragraph))
 
     def check(self, func, message, fail=False):
         """
@@ -206,23 +227,11 @@ class Document:
         return self
 
 
-class StyledWord:
-    def __init__(self, cursor_string, cursor_charweight, cursor_charposture_value, cursor_charunderline):
-        self.text = cursor_string
-        self.bold = float(cursor_charweight) > 100
-        self.italic = (str(cursor_charposture_value).lower() == 'italic')
-        self.underlined = int(cursor_charunderline) > 0
-
-    def __repr__(self):
-        return '<StyledWord %s B:%s I:%s U:%s >' % (self.text, self.bold, self.italic, self.underlined)
-
-
 class Paragraph:
-    def __init__(self, page_num, origin, styled_words):
+    def __init__(self, page_num, text, origin):
         self.page_num = page_num
-        self.text = origin.String.strip()
+        self.text = text
         self.origin = [origin]
-        self.styled_words = list(styled_words)
 
     def __repr__(self):
         return "<Paragraph page:%s text: %s>" % (self.page_num, self.text)
@@ -230,7 +239,6 @@ class Paragraph:
     def __iadd__(self, other):
         self.text += " " + other.text
         self.origin.extend(other.origin)
-        self.styled_words.extend(other.styled_words)
         return self
 
 
