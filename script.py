@@ -45,6 +45,7 @@ if __name__ == "__main__":
     document.prepare_footnotes(middle_dash_between_digits)
     document.prepare_paragraphs(canonic_links)
     document.prepare_footnotes(canonic_links)
+    document.write("out.odt")
 
     print(document)
 

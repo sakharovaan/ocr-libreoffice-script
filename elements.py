@@ -1,5 +1,8 @@
 import logging
 import textwrap
+import uno
+from os import path
+
 
 TAGS = dict(
     open_bold='{{b}}',
@@ -268,6 +271,30 @@ class Document:
             if apply_on_untagged:
                 logging.info("[START] Apply %s on footnote %s (untagged version)", func.__name__, footnote)
                 self.footnotes[i].text_untagged = func(footnote.text_untagged)
+
+    def write(self, filename):
+        """
+        Write content to file
+
+        :param filename: file to write
+        :return:
+        """
+
+        local = uno.getComponentContext()
+        resolver = local.ServiceManager.createInstanceWithContext("com.sun.star.bridge.UnoUrlResolver", local)
+        context = resolver.resolve("uno:socket,host=localhost,port=2002;urp;StarOffice.ComponentContext")
+        desktop = context.ServiceManager.createInstanceWithContext("com.sun.star.frame.Desktop", context)
+
+        url = "private:factory/swriter"
+
+        document = desktop.loadComponentFromURL(url, "_blank", 0, ())
+
+        cursor = document.Text.createTextCursor()
+        for paragraph in self.paragraphs:
+            document.Text.insertString(cursor, '\t%s\n' % paragraph.text, 0)
+
+        document.storeAsURL('file://' + path.realpath(filename), ())
+        document.dispose()
 
         return self
 
