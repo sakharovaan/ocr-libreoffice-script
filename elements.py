@@ -1,9 +1,10 @@
 import logging
 import textwrap
 import uno
+import re
 from os import path
 
-
+TAG_RE = re.compile(r'{{(\S*?)}}')
 TAGS = dict(
     open_bold='{{b}}',
     close_bold='{{/b}}',
@@ -42,6 +43,62 @@ class Document:
                 word = v['open'] + word
 
         return word
+
+    def _reverse_decide_tag(self, tag, style):
+        """
+        Decide what this tag in text supposed to mean
+
+        :param tag: tag without braces
+        :param style: dict with styles
+        :return: dict(style=style dict, put_footnote=number of footnote to put (if should))
+        """
+        warnings = ""
+
+        if tag.isdecimal():  # is it footnote tag?
+            return {'warnings': None, 'put_footnote': int(tag), 'style': style}
+
+        for key, val in TAGS.items():  # is it style tag?
+            if val == '{{%s}}' % tag:
+                if key == 'open_bold':
+                    if style['bold']:
+                        warnings += "Unclosed tag %s " % tag
+
+                    style['bold'] = True
+                    break
+                elif key == 'close_bold':
+                    if not style['bold']:
+                        warnings += "Orphaned tag %s " % tag
+
+                    style['bold'] = False
+                    break
+                elif key == 'open_italic':
+                    if style['italic']:
+                        warnings += "Unclosed tag %s " % tag
+
+                    style['italic'] = True
+                    break
+                elif key == 'close_italic':
+                    if not style['italic']:
+                        warnings += "Orphaned tag %s " % tag
+
+                    style['italic'] = False
+                    break
+                elif key == 'open_underline':
+                    if style['underlined']:
+                        warnings += "Unclosed tag %s " % tag
+
+                    style['underlined'] = True
+                    break
+                elif key == 'close_underline':
+                    if not style['underlined']:
+                        warnings += "Orphaned tag %s " % tag
+
+                    style['underlined'] = False
+                    break
+        else:
+            return
+
+        return {'warnings': warnings, 'put_footnote': None, 'style': style}
 
     def from_model(self, model):
         ctrl = model.getCurrentController()
@@ -272,6 +329,68 @@ class Document:
                 logging.info("[START] Apply %s on footnote %s (untagged version)", func.__name__, footnote)
                 self.footnotes[i].text_untagged = func(footnote.text_untagged)
 
+    def _write_paragraph(self, paragraph, document, cursor):
+        styling = dict(
+            italic=False,
+            bold=False,
+            underlined=False
+        )
+
+        tag = ""
+        put_footnote = None
+        text = document.Text
+        for i, letter in enumerate(paragraph.text):
+            if letter == '{' and paragraph.text[i:i + 2] == '{{':
+                tag = re.search(TAG_RE, paragraph.text[i:i + 15])
+                if not tag:
+                    logging.warning("[WARNING] False-positive tag search on %s", paragraph.text[i:i + 15])
+                else:
+                    tag = tag.group(1)
+                    result = self._reverse_decide_tag(tag, styling)
+                    if not result:
+                        logging.warning("[WARNING] Unknown tag %s", tag)
+                    else:
+                        styling = result['style']
+                        put_footnote = result['put_footnote']
+                        if result['warnings']:
+                            logging.warning("[WARNING] %s", result['warnings'])
+
+                tag = "{{%s}}" % tag  # for tag omitting
+
+            # put footnote before omitting
+            if put_footnote:
+                footnote = document.createInstance("com.sun.star.text.Footnote")
+                text.insertTextContent(cursor, footnote, 0)
+                footnote_cursor = footnote.Text.createTextCursor()
+                self._write_paragraph(self.footnotes[put_footnote - 1], footnote, footnote_cursor)
+                put_footnote = None
+
+            # omit tag symbol by symbol
+            if tag:
+                if tag[:1] == letter:
+                    tag = tag[1:]
+                    continue
+                else:
+                    logging.warning("[WARNING] tag (%s) and document (%s) letters mismatch",
+                                    tag, paragraph.text[i:i + 15])
+
+            if styling['bold']:
+                cursor.CharWeight = 150
+            else:
+                cursor.CharWeight = 100
+
+            if styling['italic']:
+                cursor.CharPosture.value = 'ITALIC'
+            else:
+                cursor.CharPosture.value = 'NONE'
+
+            if styling['underlined']:
+                cursor.CharUnderline = 1
+            else:
+                cursor.CharUnderline = 0
+
+            text.insertString(cursor, letter, 0)
+
     def write(self, filename):
         """
         Write content to file
@@ -288,10 +407,13 @@ class Document:
         url = "private:factory/swriter"
 
         document = desktop.loadComponentFromURL(url, "_blank", 0, ())
+        text = document.Text
 
-        cursor = document.Text.createTextCursor()
+        cursor = text.createTextCursor()
         for paragraph in self.paragraphs:
-            document.Text.insertString(cursor, '\t%s\n' % paragraph.text, 0)
+            text.insertString(cursor, '\t', 0)
+            self._write_paragraph(paragraph, document, cursor)
+            text.insertString(cursor, '\r', 0)
 
         document.storeAsURL('file://' + path.realpath(filename), ())
         document.dispose()
