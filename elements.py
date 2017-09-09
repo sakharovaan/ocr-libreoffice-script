@@ -380,9 +380,9 @@ class Document:
                 cursor.CharWeight = 100
 
             if styling['italic']:
-                cursor.CharPosture.value = 'ITALIC'
+                cursor.CharPosture = 'ITALIC'
             else:
-                cursor.CharPosture.value = 'NONE'
+                cursor.CharPosture = 'NONE'
 
             if styling['underlined']:
                 cursor.CharUnderline = 1
