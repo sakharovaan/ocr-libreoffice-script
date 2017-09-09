@@ -20,3 +20,4 @@ Script for post-processing text from OCR machines in libreoffice
 ### Current limitations / TODO
 
 * doesn't recognise footnotes continuing on other page
+* doesn't reconize links with romanian numbers

@@ -1,9 +1,9 @@
 import uno
 import logging
 
-from elements import Document, Paragraph, Footnote
+from elements import Document
 from parsers import middle_dash_between_digits, canonic_links
-
+from generators import star_footnotes
 
 def get_model():
     """
@@ -37,9 +37,9 @@ if __name__ == "__main__":
     document = Document().from_model(model)
     document.strip_empty()
     document.strip_custom(lambda x: not(len(x) == 3 and str(x).isdecimal()), use_tagged=False)  # page numbers
-    document.strip_footnotes(('*'*(i+1) for i in range(1000)))
+    document.strip_footnotes(star_footnotes())
     document.check(lambda x: len(x) > 60, "Too short paragraph ")
-    document.replace_footnotes(('*'*(i+1) for i in range(1000)))
+    document.replace_footnotes(star_footnotes())
     document.merge_paragraphs()
     document.prepare_paragraphs(middle_dash_between_digits)
     document.prepare_footnotes(middle_dash_between_digits)
