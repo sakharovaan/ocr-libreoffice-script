@@ -2,8 +2,10 @@ import uno
 import logging
 
 from elements import Document
-from parsers import middle_dash_between_digits, canonic_links
+from parsers.middle_dash_between_digits import middle_dash_between_digits
+from parsers.canonic_links import canonic_links
 from generators import star_footnotes
+
 
 def get_model():
     """
@@ -46,7 +48,3 @@ if __name__ == "__main__":
     document.prepare_paragraphs(canonic_links)
     document.prepare_footnotes(canonic_links)
     document.write("out.odt")
-
-    print(document)
-
-
