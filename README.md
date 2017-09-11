@@ -9,7 +9,8 @@ Script for post-processing text from OCR machines in libreoffice
 * Keep only basic formatting: bold, italic, underlined
 * Replace dash between digits to middle-sized dash
 * Replace canonical links like (1 Паралип. 28, 5–7) to (1Пар.28:5–7)
-
+* Convert pre-reform spelling to contemporary
+* Change 'е' to 'ё' (yofication) based on dictionary
 
 ### Running
 
