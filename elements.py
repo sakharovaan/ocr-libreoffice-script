@@ -329,14 +329,11 @@ class Document:
                 logging.info("[START] Apply %s on footnote %s (untagged version)", func.__name__, footnote)
                 self.footnotes[i].text_untagged = func(footnote.text_untagged)
 
-    def _write_paragraph(self, paragraph, document, cursor):
-        styling = dict(
-            italic=False,
-            bold=False,
-            underlined=False
-        )
-
+    def _write_paragraph(self, paragraph, document, cursor, styling):
         tag = ""
+        buffer = ""
+        flush_buffer = False
+
         put_footnote = None
         text = document.Text
         for i, letter in enumerate(paragraph.text):
@@ -357,6 +354,8 @@ class Document:
 
                 tag = "{{%s}}" % tag  # for tag omitting
 
+                flush_buffer = True
+
             # put footnote before omitting
             if put_footnote:
                 footnote = document.createInstance("com.sun.star.text.Footnote")
@@ -374,22 +373,34 @@ class Document:
                     logging.warning("[WARNING] tag (%s) and document (%s) letters mismatch",
                                     tag, paragraph.text[i:i + 15])
 
-            if styling['bold']:
-                cursor.CharWeight = 150
-            else:
-                cursor.CharWeight = 100
+            # FIXME wrong style preservation on next paragraph
 
-            if styling['italic']:
-                cursor.CharPosture = 'ITALIC'
-            else:
-                cursor.CharPosture = 'NONE'
+            if flush_buffer:
+                text.insertString(cursor, buffer, 0)
+                buffer = ""
+                flush_buffer = False
 
-            if styling['underlined']:
-                cursor.CharUnderline = 1
-            else:
-                cursor.CharUnderline = 0
+                if styling['bold']:
+                    cursor.CharWeight = 150
+                else:
+                    cursor.CharWeight = 100
 
-            text.insertString(cursor, letter, 0)
+                if styling['italic']:
+                    cursor.CharPosture = 'ITALIC'
+                else:
+                    cursor.CharPosture = 'NONE'
+
+                if styling['underlined']:
+                    cursor.CharUnderline = 1
+                else:
+                    cursor.CharUnderline = 0
+
+            buffer += letter
+
+        else:
+            text.insertString(cursor, buffer, 0)
+
+        return styling
 
     def write(self, filename):
         """
@@ -408,11 +419,16 @@ class Document:
 
         document = desktop.loadComponentFromURL(url, "_blank", 0, ())
         text = document.Text
+        styling = dict(
+            italic=False,
+            bold=False,
+            underlined=False
+        )
 
         cursor = text.createTextCursor()
         for paragraph in self.paragraphs:
             text.insertString(cursor, '\t', 0)
-            self._write_paragraph(paragraph, document, cursor)
+            styling = self._write_paragraph(paragraph, document, cursor, styling)
             text.insertString(cursor, '\r', 0)
 
         document.storeAsURL('file://' + path.realpath(filename), ())
