@@ -3,7 +3,9 @@ import logging
 
 from elements import Document
 from parsers.middle_dash_between_digits import middle_dash_between_digits
-from parsers.canonic_links import canonic_links
+from parsers.old_spell import old_spell
+from parsers.yoficator import yoficator
+from parsers.cut_soft_hyphen import cut_soft_hyphen
 from generators import star_footnotes
 
 
@@ -38,13 +40,15 @@ if __name__ == "__main__":
     model = get_model()
     document = Document().from_model(model)
     document.strip_empty()
-    document.strip_custom(lambda x: not(len(x) == 3 and str(x).isdecimal()), use_tagged=False)  # page numbers
-    document.strip_footnotes(star_footnotes())
+    #document.strip_custom(lambda x: not(len(x) == 3 and str(x).isdecimal()), use_tagged=False)  # page numbers
+    #document.strip_footnotes(star_footnotes())
     document.check(lambda x: len(x) > 60, "Too short paragraph ")
-    document.replace_footnotes(star_footnotes())
+    #document.replace_footnotes(star_footnotes())
     document.merge_paragraphs()
     document.prepare_paragraphs(middle_dash_between_digits)
     document.prepare_footnotes(middle_dash_between_digits)
-    document.prepare_paragraphs(canonic_links)
-    document.prepare_footnotes(canonic_links)
+    document.prepare_paragraphs(old_spell)
+    document.prepare_paragraphs(yoficator)
+    document.prepare_paragraphs(cut_soft_hyphen)
+    #document.prepare_footnotes(canonic_links)
     document.write("out.odt")

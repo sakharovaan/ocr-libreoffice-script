@@ -26,11 +26,11 @@ rules = [
     (r'ѳ', 'ф'),
     (r'Ѵ', 'И'),
     (r'ѵ', 'и'),
-    (r'І', 'И'),
-    (r'і', 'и'),
     (r'(\w+)ъ\b', '{}'),
-    (r'I', 'И'),
-    (r'i', 'и'),
+    (r'([^a-zA-Z\{\}])I([^a-zA-Z\{\}])', '{}И{}'),
+    (r'([^a-zA-Z\{\}])i([^a-zA-Z\{\}])', '{}и{}'),
+    (r'([^a-zA-Z\{\}])І([^a-zA-Z\{\}])', '{}И{}'),
+    (r'([^a-zA-Z\{\}])і([^a-zA-Z\{\}])', '{}и{}'),
     (r'тиранни', 'тирани'),
     (r'(\w+)авния\b', '{}авние'),
     (r'(\w+)айния\b', '{}айние'),
@@ -266,8 +266,8 @@ rules = [
     (r'\bаттак', 'атак'),
     (r'\bпарчев', 'парчов'),
     (r'\bпарчёв', 'парчов'),
-    (r'\bоднакоже', 'однако{32}же'),
-    (r'\bоднакож', 'однако{32}ж'),
+    (r'\bоднакоже', 'однако же'),
+    (r'\bоднакож', 'однако ж'),
     (r'\bразсуждение', 'рассуждение'),
     (r'\bсчасти', 'счасть'),
     (r'\bстрасти', 'страсть'),
@@ -326,8 +326,8 @@ rules = [
     (r'\bтак-называемого', 'так называемого'),
     (r'\bтак-сказать', 'так сказать'),
     (r'\bто-есть', 'то есть'),
-    (r'т.-е.', 'т.е.'),
-    (r'т.\s+е.', 'т.е.'),
+    (r'т\.-е\.', 'т.е.'),
+    (r'т\.\s+е\.', 'т.е.'),
     (r'-бы\b', ' бы'),
     (r'-б\b', ' б'),
     (r'-же\b', ' же'),
@@ -477,9 +477,7 @@ rules = [
     (r'\bшипунии\b', 'шипуньи'),
     (r'\bшунии\b', 'шуньи'),
     (r'\bщебетунии\b', 'щебетуньи'),
-    # my additions
-    (r'\bкоему\b', 'которому'),
-    (r'\bкоих\b', 'которых'),
+    # sakharov additions
     (r'ою\b', 'ой'),
     (r'ею\b', 'ей'),
     (r'\bцерквах\b', 'церквях'),
@@ -487,19 +485,20 @@ rules = [
 rules_compiled = list((re.compile(elem[0]), elem[1]) for elem in rules)
 
 
+def _replacer(match, rule_num):
+    matches = []
+
+    for i in range(1, 1000):
+        try:
+            matches.append(match.group(i))
+        except IndexError:
+            break
+
+    return rules[rule_num][1].format(*matches)
+
+
 def old_spell(text):
-    def replacer(match, rule_num):
-        matches = []
-
-        for i in range(1, 1000):
-            try:
-                matches.append(match.group(i))
-            except IndexError:
-                break
-
-        return rules[rule_num][1].format(*matches)
-
     for i, rule in enumerate(rules_compiled):
-        text = re.sub(rule[0], partial(replacer, rule_num=i), text)
+        text = re.sub(rule[0], partial(_replacer, rule_num=i), text)
 
     return text

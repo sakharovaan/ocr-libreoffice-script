@@ -3,3 +3,4 @@ def star_footnotes():
     while True:
         yield '*' * i  # can be converted to dict if we'll need additional parms
         i += 1
+
