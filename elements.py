@@ -286,7 +286,7 @@ class Document:
         new_pars = []
 
         for paragraph in self.paragraphs:
-            if not str(paragraph.text_untagged[0]).isupper() and len(new_pars) > 0:
+            if str(paragraph.text_untagged[0]).islower() and len(new_pars) > 0:
                 logging.info("[CHANGED] Merging paragraphs %s and %s", new_pars[-1:][0], paragraph)
                 new_pars[-1:][0] += paragraph
             else:
@@ -329,13 +329,24 @@ class Document:
                 logging.info("[START] Apply %s on footnote %s (untagged version)", func.__name__, footnote)
                 self.footnotes[i].text_untagged = func(footnote.text_untagged)
 
-    def _write_paragraph(self, paragraph, document, cursor, styling):
+    def _write_paragraph(self, paragraph, document, cursor):
         tag = ""
         buffer = ""
         flush_buffer = False
 
         put_footnote = None
         text = document.Text
+        styling = dict(
+            italic=False,
+            bold=False,
+            underlined=False
+        )
+
+        # reset styling, supposing each paragraph has its own style tags
+        cursor.CharWeight = 100
+        cursor.CharPosture = 'NONE'
+        cursor.CharUnderline = 0
+
         for i, letter in enumerate(paragraph.text):
             if letter == '{' and paragraph.text[i:i + 2] == '{{':
                 tag = re.search(TAG_RE, paragraph.text[i:i + 15])
@@ -372,8 +383,6 @@ class Document:
                 else:
                     logging.warning("[WARNING] tag (%s) and document (%s) letters mismatch",
                                     tag, paragraph.text[i:i + 15])
-
-            # FIXME wrong style preservation on next paragraph
 
             if flush_buffer:
                 text.insertString(cursor, buffer, 0)
@@ -419,16 +428,11 @@ class Document:
 
         document = desktop.loadComponentFromURL(url, "_blank", 0, ())
         text = document.Text
-        styling = dict(
-            italic=False,
-            bold=False,
-            underlined=False
-        )
 
         cursor = text.createTextCursor()
         for paragraph in self.paragraphs:
             text.insertString(cursor, '\t', 0)
-            styling = self._write_paragraph(paragraph, document, cursor, styling)
+            self._write_paragraph(paragraph, document, cursor)
             text.insertString(cursor, '\r', 0)
 
         document.storeAsURL('file://' + path.realpath(filename), ())
